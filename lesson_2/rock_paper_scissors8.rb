@@ -120,7 +120,7 @@ class R2d2 < Computer
 end
 
 class Hal < Computer
-  MY_VALUES = ['rock', 'liard', 'spock', 'scissors', 'scissors', 'scissors']
+  MY_VALUES = ['rock', 'lizard', 'spock', 'scissors', 'scissors', 'scissors']
   def choose
     self.move = Move.new(MY_VALUES.sample)
     previous_moves << move
@@ -151,6 +151,9 @@ end
 
 class RPSGame
   OPPONENTS = [R2d2, Hal, Chappie, Sonny, Number5]
+
+  private
+
   attr_accessor :human, :computer, :score, :winner, :tourn_winner
 
   def initialize
@@ -253,6 +256,8 @@ class RPSGame
     display_winner
     display_score
   end
+
+  public
 
   def play
     display_welcome_message
