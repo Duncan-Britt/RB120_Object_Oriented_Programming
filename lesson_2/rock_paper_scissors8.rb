@@ -150,9 +150,9 @@ class Number5 < Computer
 end
 
 class RPSGame
-  OPPONENTS = [R2d2, Hal, Chappie, Sonny, Number5]
-
   private
+
+  OPPONENTS = [R2d2, Hal, Chappie, Sonny, Number5]
 
   attr_accessor :human, :computer, :score, :winner, :tourn_winner
 
