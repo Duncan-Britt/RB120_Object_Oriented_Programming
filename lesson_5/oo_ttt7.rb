@@ -205,7 +205,7 @@ class TTTGame
     @board = Board.new
     @human = Player.new(HUMAN_MARKER)
     @computer = Player.new(COMPUTER_MARKER)
-    @move_methods = [Proc.new { human_moves }, Proc.new { defensive_computer_moves }]
+    @move_methods = [Proc.new { human_moves }, Proc.new { computer_moves }]
     @turn_idx = FIRST_TO_MOVE_IDX
     @tournament_won = false
   end
@@ -261,7 +261,7 @@ class TTTGame
   #   board[board.unmarked_keys.sample] = computer.marker
   # end
 
-  def defensive_computer_moves
+  def computer_moves
     choice = board.unmarked_keys.sample
     # Immediate threats
     Board::WINNING_LINES.each do |line|
