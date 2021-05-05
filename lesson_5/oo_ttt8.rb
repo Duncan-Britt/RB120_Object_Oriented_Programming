@@ -7,9 +7,9 @@ module FormatIO
     super "#{message.center(LINE_LENGTH)}"
   end
 
-  def get_input
+  def gets
     print "#{" " * (CURSOR_SPACE)}=> "
-    gets
+    super
   end
 end
 
@@ -122,8 +122,7 @@ class Square
 end
 
 class Player
-  attr_reader :marker
-  attr_accessor :score
+  attr_accessor :score, :marker
 
   def initialize(marker)
     @marker = marker
@@ -142,6 +141,10 @@ class TTTGame
   def play
     clear
     display_welcome_message
+    get_names
+    set_markers
+    set_difficulty
+    clear
     loop do
       run_games
       break unless tournament_won
@@ -155,11 +158,85 @@ class TTTGame
 
   private
 
+  def get_names
+    puts "Enter your name:"
+    loop do
+      self.username = gets.chomp
+      break unless username.empty?
+      puts "You must enter a name."
+    end
+    puts "Enter a name for your opponent:"
+    loop do
+      self.computer_name = gets.chomp
+      break unless computer_name.empty?
+      puts "You must enter a name."
+    end
+
+  end
+
+  def set_markers
+    puts "Would you like to set custom markers for the tournament? (y/n)"
+    answer = nil
+    loop do
+      answer = gets.chomp.downcase
+      break if answer == 'y' or answer == 'n'
+      puts "Input must be 'y' or 'n'"
+    end
+    case answer
+    when 'y'
+      choose_markers
+    end
+  end
+
+  def choose_markers
+    puts "Choose your marker"
+    mark = nil
+    loop do
+      mark = gets.chomp
+      break if mark.length == 1
+      puts "Invalid input. Marker must be 1 character"
+    end
+    human.marker = mark
+    puts "Choose computer marker"
+    loop do
+      mark = gets.chomp
+      break if mark.length == 1
+      puts "Invalid input. Marker must be 1 character"
+    end
+    computer.marker = mark
+  end
+
+  def set_difficulty
+    puts "Please select a difficulty level for the tournament:\n"
+    puts "Easy (e)\n"
+    puts "Medium (m)\n"
+    puts "Impossible(i)"
+
+    case get_difficulty
+    when 'e'
+      @move_methods[1] = Proc.new { easy_moves }
+    when 'm'
+      @move_methods[1] = Proc.new { medium_moves }
+    when 'i'
+      @move_methods[1] = Proc.new { unbeatable_moves }
+    end
+  end
+
+  def get_difficulty
+    difficulty = nil
+    loop do
+      difficulty = gets.chomp.downcase
+      break if difficulty == 'e' || difficulty == 'm' || difficulty == 'i'
+      puts "Input must be 'e', 'm', or 'i'\n"
+    end
+    difficulty
+  end
+
   def play_tournament_again?
     answer = nil
     loop do
       puts "Would you like to play another tournament? (y/n)"
-      answer = get_input.chomp.downcase
+      answer = gets.chomp.downcase
       break if %w(y n).include? answer
       puts "Sorry, must be y or n"
     end
@@ -179,10 +256,14 @@ class TTTGame
   end
 
   def reset_tournament
+    self.starting_player_idx = FIRST_TO_MOVE_IDX
     reset
     human.score = 0
     computer.score = 0
     self.tournament_won = false
+    set_difficulty
+    set_markers
+    clear
   end
 
   def run_games
@@ -195,9 +276,14 @@ class TTTGame
         break
       end
       break unless play_again?
+      alternate_starting_player
       reset
       display_play_again_message
     end
+  end
+
+  def alternate_starting_player
+    self.starting_player_idx = (starting_player_idx + 1) % 2
   end
 
   def player_move
@@ -209,7 +295,7 @@ class TTTGame
   end
 
   attr_reader :board, :human, :computer
-  attr_accessor :tournament_won
+  attr_accessor :tournament_won, :starting_player_idx, :username, :computer_name
 
   def initialize
     @board = Board.new
@@ -217,6 +303,7 @@ class TTTGame
     @computer = Player.new(COMPUTER_MARKER)
     @move_methods = [Proc.new { human_moves }, Proc.new { computer_moves }]
     @turn_idx = FIRST_TO_MOVE_IDX
+    @starting_player_idx = FIRST_TO_MOVE_IDX
     @tournament_won = false
   end
 
@@ -259,7 +346,7 @@ class TTTGame
     puts "Choose a square (#{joinor(board.unmarked_keys)}): "
     square = nil
     loop do
-      square = get_input.chomp.to_i
+      square = gets.chomp.to_i
       break if board.unmarked_keys.include?(square)
       puts "Sorry, that's not a valid choice."
     end
@@ -267,50 +354,82 @@ class TTTGame
     board[square] = human.marker
   end
 
-  # def computer_moves
-  #   board[board.unmarked_keys.sample] = computer.marker
-  # end
+  def easy_moves
+    board[board.unmarked_keys.sample] = computer.marker
+  end
 
-  # def computer_moves
-  #   choice = board.unmarked_keys.sample
-  #   # Immediate threats
-  #   Board::WINNING_LINES.each do |line|
-  #     count = 0
-  #     unmarked = nil
-  #     line.each do |key|
-  #       count += 1 if board.squares[key].marker == human.marker
-  #       unmarked = key if board.unmarked_keys.include?(key)
-  #     end
-  #     if count == 2 && unmarked
-  #       choice = unmarked
-  #       break
-  #     end
-  #   end
-  #   # Immediate wins
-  #   Board::WINNING_LINES.each do |line|
-  #     count = 0
-  #     other = nil
-  #     line.each do |key|
-  #       if board.squares[key].marker == computer.marker
-  #         count += 1
-  #       else
-  #         other = key
-  #       end
-  #     end
-  #
-  #     if count == 2 && board.unmarked_keys.include?(other)
-  #       choice = other
-  #       break
-  #     end
-  #   end
-  #
-  #   board[choice] = computer.marker
-  # end
-
-  def computer_moves
-    brd = board.dup
-    choice, score = minimax(computer, brd)
+  def medium_moves
+    choice = if immediate_win
+               immediate_win
+             elsif immediate_threat
+               immediate_threat
+             else
+               board.unmarked_keys.sample
+             end
     board[choice] = computer.marker
+  end
+
+  def immediate_threat
+    Board::WINNING_LINES.each do |line|
+      count = 0
+      choice = nil
+      line.each do |key|
+        count += 1 if board.squares[key].marker == human.marker
+        choice = key if board.unmarked_keys.include?(key)
+      end
+      if count == 2 && choice
+        return choice
+      end
+    end
+    nil
+  end
+
+  def immediate_win
+    Board::WINNING_LINES.each do |line|
+      count = 0
+      choice = nil
+      line.each do |key|
+        if board.squares[key].marker == computer.marker
+          count += 1
+        else
+          choice = key
+        end
+      end
+
+      if count == 2 && board.unmarked_keys.include?(choice)
+        return choice
+      end
+    end
+    nil
+  end
+
+  def unbeatable_moves
+    if immediate_win
+      board[immediate_win] = computer.marker
+    else
+      t1 = Thread.new {
+        brd = board.dup
+        choice, score = minimax(computer, brd)
+        board[choice] = computer.marker
+      }
+      t2 = Thread.new {
+        spinner = Enumerator.new do |e|
+          loop do
+            e.yield '|'
+            e.yield '/'
+            e.yield '-'
+            e.yield '\\'
+          end
+        end
+        loop do |i|
+          break unless t1.alive?
+          printf("\r%sLOADING %s ", ' '*FormatIO::CURSOR_SPACE, spinner.next)
+          sleep(0.1)
+        end
+      }
+      t1.join
+      t2.join
+    end
   end
 
   def get_score(player, brd)
@@ -337,7 +456,6 @@ class TTTGame
     available_keys = []
     scores = []
     brd.unmarked_keys.each do |key|
-      # binding.pry
       available_keys << key
       bord = brd.dup
       bord[key] = player.marker
@@ -362,7 +480,6 @@ class TTTGame
     end
 
     choice = choices.sample
-    puts "#{scores[choice]} #{scores}, #{available_keys[choice]}, #{choices}"
     case scores[choice]
     when 10
       points = -10
@@ -393,7 +510,7 @@ class TTTGame
     answer = nil
     loop do
       puts "Would you like to play again? (y/n)"
-      answer = get_input.chomp.downcase
+      answer = gets.chomp.downcase
       break if %w(y n).include? answer
       puts "Sorry, must be y or n"
     end
@@ -402,12 +519,12 @@ class TTTGame
   end
 
   def clear
-    # system 'clear'
+    system 'clear'
   end
 
   def reset
     board.reset
-    @turn_idx = FIRST_TO_MOVE_IDX
+    @turn_idx = starting_player_idx
     clear
   end
 
