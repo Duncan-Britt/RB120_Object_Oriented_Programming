@@ -22,9 +22,19 @@ class Board
                   [[1, 4, 7], [2, 5, 8], [3, 6, 9]] + # columns
                   [[1, 5, 9], [3, 5, 7]]              # diagonals
 
-  def initialize
-    @squares = {}
-    reset
+  def initialize(squares={}, dupl=false)
+    @squares = squares
+    reset unless dupl
+  end
+
+  def dup
+    new_squares = {}
+    (1..9).each do |key|
+      new_squares[key] = Square.new
+      new_squares[key].marker = @squares[key].marker
+    end
+
+    Board.new(new_squares, true)
   end
 
   def set_square_at(key, marker)
@@ -261,40 +271,106 @@ class TTTGame
   #   board[board.unmarked_keys.sample] = computer.marker
   # end
 
+  # def computer_moves
+  #   choice = board.unmarked_keys.sample
+  #   # Immediate threats
+  #   Board::WINNING_LINES.each do |line|
+  #     count = 0
+  #     unmarked = nil
+  #     line.each do |key|
+  #       count += 1 if board.squares[key].marker == human.marker
+  #       unmarked = key if board.unmarked_keys.include?(key)
+  #     end
+  #     if count == 2 && unmarked
+  #       choice = unmarked
+  #       break
+  #     end
+  #   end
+  #   # Immediate wins
+  #   Board::WINNING_LINES.each do |line|
+  #     count = 0
+  #     other = nil
+  #     line.each do |key|
+  #       if board.squares[key].marker == computer.marker
+  #         count += 1
+  #       else
+  #         other = key
+  #       end
+  #     end
+  #
+  #     if count == 2 && board.unmarked_keys.include?(other)
+  #       choice = other
+  #       break
+  #     end
+  #   end
+  #
+  #   board[choice] = computer.marker
+  # end
+
   def computer_moves
-    choice = board.unmarked_keys.sample
-    # Immediate threats
-    Board::WINNING_LINES.each do |line|
-      count = 0
-      unmarked = nil
-      line.each do |key|
-        count += 1 if board.squares[key].marker == human.marker
-        unmarked = key if board.unmarked_keys.include?(key)
-      end
-      if count == 2 && unmarked
-        choice = unmarked
-        break
-      end
-    end
-    # Immediate wins
-    Board::WINNING_LINES.each do |line|
-      count = 0
-      other = nil
-      line.each do |key|
-        if board.squares[key].marker == computer.marker
-          count += 1
-        else
-          other = key
-        end
-      end
-
-      if count == 2 && board.unmarked_keys.include?(other)
-        choice = other
-        break
-      end
-    end
-
+    brd = board.dup
+    choice, score = minimax(computer, brd)
     board[choice] = computer.marker
+  end
+
+  def get_score(player, brd)
+    case brd.winning_marker
+    when player.marker
+      binding.pry
+      -10
+    when nil
+      0
+    else
+      10
+    end
+  end
+
+  def minimax(player, brd)
+    if brd.someone_won? || brd.full?
+      if brd.winning_marker == "O" && player == computer
+        binding.pry
+      end
+      return nil, get_score(player, brd)
+    end
+
+    available_keys = []
+    scores = []
+    brd.unmarked_keys.each do |key|
+      # binding.pry
+      available_keys << key
+      bord = brd.dup
+      bord[key] = player.marker
+      if player == computer
+        a, b = minimax(human, bord)
+        scores << b
+      else
+        a, b = minimax(computer, bord)
+        scores << b
+      end
+    end
+
+    choices = []
+    best = -10
+    scores.each_with_index do |e, i|
+      if e > best
+        choices = [i]
+        best = e
+      elsif e == best
+        choices << i
+      end
+    end
+
+    choice = choices.sample
+    puts "#{scores[choice]} #{scores}, #{available_keys[choice]}, #{choices}"
+    case scores[choice]
+    when 10
+      points = -10
+    when -10
+      points = 10
+    else
+      points = 0
+    end
+    return available_keys[choice], points
   end
 
   def display_result
@@ -325,7 +401,7 @@ class TTTGame
   end
 
   def clear
-    system 'clear'
+    # system 'clear'
   end
 
   def reset
