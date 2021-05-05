@@ -403,9 +403,15 @@ class TTTGame
     nil
   end
 
+  def first_move?
+    board.unmarked_keys.size == 9
+  end
+
   def unbeatable_moves
     if immediate_win
       board[immediate_win] = computer.marker
+    elsif first_move?
+      board[board.unmarked_keys.sample] = computer.marker
     else
       t1 = Thread.new {
         brd = board.dup
