@@ -7,11 +7,6 @@ class String
   end
 
   def red; colorize(31) end
-  def green; colorize(32) end
-  def yellow; colorize(33) end
-  def blue; colorize(34) end
-  def pink; colorize(35) end
-  def light_blue; colorize(36) end
 end
 
 module FormatIO
@@ -477,7 +472,7 @@ class TTTGame
         end
         loop do
           break unless t1.alive?
-          printf("\r%s%s %s ", ' ' * FormatIO::CURSOR_SPACE, "LOADING".red, spinner.next)
+          printf("\r%s%s %s ", ' ' * FormatIO::CURSOR_SPACE, 'LOADING'.red, spinner.next)
           sleep(0.1)
         end
       end
