@@ -22,7 +22,7 @@ class Board
                   [[1, 4, 7], [2, 5, 8], [3, 6, 9]] + # columns
                   [[1, 5, 9], [3, 5, 7]]              # diagonals
 
-  def initialize(squares={}, dupl=false)
+  def initialize(squares={}, dupl: false)
     @squares = squares
     reset unless dupl
   end
@@ -34,7 +34,7 @@ class Board
       new_squares[key].marker = @squares[key].marker
     end
 
-    Board.new(new_squares, true)
+    Board.new(new_squares, dupl: true)
   end
 
   def set_square_at(key, marker)
@@ -68,8 +68,8 @@ class Board
   end
 
   def reset
-    (1..9).each { |key| @squares[key] = Square.new }
-    @initial = Square.new.marker
+    (1..9).each { |key| @squares[key] = Square.new(key.to_s) }
+    # @initial = Square.new.marker                   FIXME FIXME FIXME
   end
 
   # rubocop:disable Metrics/AbcSize
@@ -113,11 +113,11 @@ class Square
   end
 
   def marked?
-    marker != INITIAL_MARKER
+    !(/[1-9]/.match?(marker))
   end
 
   def unmarked?
-    marker == INITIAL_MARKER
+    /[1-9]/.match?(marker)
   end
 end
 
@@ -141,7 +141,7 @@ class TTTGame
   def play
     clear
     display_welcome_message
-    get_names
+    set_names
     set_markers
     set_difficulty
     clear
@@ -158,7 +158,7 @@ class TTTGame
 
   private
 
-  def get_names
+  def set_names
     puts "Enter your name:"
     loop do
       self.username = gets.chomp
@@ -171,7 +171,6 @@ class TTTGame
       break unless computer_name.empty?
       puts "You must enter a name."
     end
-
   end
 
   def set_markers
@@ -179,7 +178,7 @@ class TTTGame
     answer = nil
     loop do
       answer = gets.chomp.downcase
-      break if answer == 'y' or answer == 'n'
+      break if answer == 'y' || answer == 'n'
       puts "Input must be 'y' or 'n'"
     end
     case answer
@@ -207,12 +206,13 @@ class TTTGame
   end
 
   def set_difficulty
+    puts ""
     puts "Please select a difficulty level for the tournament:\n"
     puts "Easy (e)\n"
     puts "Medium (m)\n"
     puts "Impossible(i)"
 
-    case get_difficulty
+    case difficulty
     when 'e'
       @move_methods[1] = Proc.new { easy_moves }
     when 'm'
@@ -222,14 +222,14 @@ class TTTGame
     end
   end
 
-  def get_difficulty
-    difficulty = nil
+  def difficulty
+    result = nil
     loop do
-      difficulty = gets.chomp.downcase
-      break if difficulty == 'e' || difficulty == 'm' || difficulty == 'i'
+      result = gets.chomp.downcase
+      break if result == 'e' || result == 'm' || result == 'i'
       puts "Input must be 'e', 'm', or 'i'\n"
     end
-    difficulty
+    result
   end
 
   def play_tournament_again?
@@ -333,9 +333,10 @@ class TTTGame
   end
 
   def joinor(arr, delim=',', last='or')
-    if arr.size == 1
-      "#{arr[0]}"
-    elsif arr.size == 2
+    case arr.size
+    when 1
+      arr[0]
+    when 2
       arr.join(" #{last} ")
     else
       "#{arr[0..-2].join("#{delim} ")}#{delim} #{last} #{arr[-1]}"
@@ -413,12 +414,12 @@ class TTTGame
     elsif first_move?
       board[board.unmarked_keys.sample] = computer.marker
     else
-      t1 = Thread.new {
+      t1 = Thread.new do
         brd = board.dup
-        choice, score = minimax(computer, brd)
+        choice, _score = minimax(computer, brd)
         board[choice] = computer.marker
-      }
-      t2 = Thread.new {
+      end
+      t2 = Thread.new do
         spinner = Enumerator.new do |e|
           loop do
             e.yield '|'
@@ -427,12 +428,12 @@ class TTTGame
             e.yield '\\'
           end
         end
-        loop do |i|
+        loop do
           break unless t1.alive?
-          printf("\r%sLOADING %s ", ' '*FormatIO::CURSOR_SPACE, spinner.next)
+          printf("\r%sLOADING %s ", ' ' * FormatIO::CURSOR_SPACE, spinner.next)
           sleep(0.1)
         end
-      }
+      end
       t1.join
       t2.join
     end
@@ -441,8 +442,6 @@ class TTTGame
   def get_score(player, brd)
     case brd.winning_marker
     when player.marker
-      binding.pry
-      # this is unnecessary, FIXME
       -10
     when nil
       0
@@ -451,14 +450,7 @@ class TTTGame
     end
   end
 
-  def minimax(player, brd)
-    if brd.someone_won? || brd.full?
-      if brd.winning_marker == "O" && player == computer
-        binding.pry
-      end
-      return nil, get_score(player, brd)
-    end
-
+  def scores_for_unmarked_spots(player, brd)
     available_keys = []
     scores = []
     brd.unmarked_keys.each do |key|
@@ -466,34 +458,48 @@ class TTTGame
       bord = brd.dup
       bord[key] = player.marker
       if player == computer
-        a, b = minimax(human, bord)
-        scores << b
+        _, b = minimax(human, bord)
       else
-        a, b = minimax(computer, bord)
-        scores << b
+        _, b = minimax(computer, bord)
       end
+      scores << b
     end
+    return available_keys, scores
+  end
 
-    choices = []
+  def perfect_choices(scores)
+    options = []
     best = -10
     scores.each_with_index do |e, i|
       if e > best
-        choices = [i]
+        options = [i]
         best = e
       elsif e == best
-        choices << i
+        options << i
       end
     end
+    options
+  end
 
-    choice = choices.sample
-    case scores[choice]
+  def reverse_for_lower_stack_frame(score)
+    case score
     when 10
-      points = -10
+      -10
     when -10
-      points = 10
+      10
     else
-      points = 0
+      0
     end
+  end
+
+  def minimax(player, brd)
+    return nil, get_score(player, brd) if brd.someone_won? || brd.full?
+
+    available_keys, scores = scores_for_unmarked_spots(player, brd)
+
+    choice = perfect_choices(scores).sample
+    points = reverse_for_lower_stack_frame(scores[choice])
+
     return available_keys[choice], points
   end
 
