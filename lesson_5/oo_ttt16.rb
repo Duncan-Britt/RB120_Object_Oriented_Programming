@@ -12,13 +12,55 @@ end
 module FormatIO
   LINE_LENGTH = 70
   CURSOR_SPACE = LINE_LENGTH / 5
-  def puts(message)
-    super message.center(LINE_LENGTH)
+  def puts(message, red: false)
+    if red
+      super message.center(LINE_LENGTH).red
+    else
+      super message.center(LINE_LENGTH)
+    end
   end
 
   def gets
     print "#{' ' * (CURSOR_SPACE)}=> ".red
     super
+  end
+end
+
+module Loadable
+  def load(method)
+    t1 = Thread.new do
+      method.call
+    end
+    t2 = Thread.new do
+      spin(t1)
+    end
+    t1.join
+    t2.join
+  end
+
+  def spin(thread)
+    spinner = make_spinner
+
+    loop do
+      break unless thread.alive?
+      printf("\r%s%s %s ",
+             ' ' * FormatIO::CURSOR_SPACE,
+             'LOADING'.red,
+             spinner.next)
+      sleep(0.1)
+    end
+    print "\r"
+  end
+
+  def make_spinner
+    Enumerator.new do |e|
+      loop do
+        e.yield '|'.red
+        e.yield '/'.red
+        e.yield '-'.red
+        e.yield '\\'.red
+      end
+    end
   end
 end
 
@@ -183,6 +225,7 @@ end
 
 class TTTGame
   include FormatIO
+  include Loadable
 
   HUMAN_MARKER = "X"
   COMPUTER_MARKER = "O"
@@ -263,7 +306,7 @@ class TTTGame
   def set_difficulty
     prompt_for_difficulty
 
-    @move_methods[1] = case difficulty
+    move_methods[1] = case difficulty
                        when 'e'
                          Proc.new { easy_moves }
                        when 'm'
@@ -363,16 +406,20 @@ class TTTGame
   end
 
   attr_reader :board, :human, :computer, :smart_move
-  attr_accessor :tournament_won, :starting_player_idx
+  attr_accessor :tournament_won, :starting_player_idx, :turn_idx, :move_methods
 
   def initialize
     @board = Board.new
     @human = Player.new
     @computer = Player.new
-    @move_methods = [Proc.new { human_moves }, Proc.new { computer_moves }]
+    @tournament_won = false
+    ready_moves
+  end
+
+  def ready_moves
+    @move_methods = [Proc.new { human_moves }]
     @turn_idx = FIRST_TO_MOVE_IDX
     @starting_player_idx = FIRST_TO_MOVE_IDX
-    @tournament_won = false
     @smart_move = Proc.new do
       choices, _score = minimax(computer, board, human)
       choice = sneak_attack(choices)
@@ -446,8 +493,58 @@ class TTTGame
   end
   # rubocop:enable Metrics/MethodLength
 
+  def cheat_display
+    clear_screen_and_display_board
+    puts "Choose a square"
+    string = ''
+    i = 1
+    line = ''
+    loop do
+      line << if board.unmarked_keys.include?(i)
+                i.to_s
+              else
+                '_'
+              end
+
+      if (i % 3).zero?
+        line = line.center(FormatIO::LINE_LENGTH)
+        line << "\n"
+        string << line
+        line = ''
+      else
+        line << ' '
+      end
+      i += 1
+      break if i == 10
+    end
+
+    a = Proc.new do
+      if first_move?
+        good_choices = (1..9).to_a
+      else
+        good_choices, score = minimax(human, board, computer)
+      end
+
+      if score == 10
+        good_choices = immediate_wins_for(computer)
+      end
+
+      string = string.chars.map do |chr|
+        if good_choices.include?(chr.to_i)
+          chr.red
+        else
+          chr
+        end
+      end.join
+    end
+
+    load(a)
+    print string
+  end
+
   def human_moves
     puts "Choose a square"
+    puts "(Confused? Enter 'help' for guidance)"
     display_available_spots
     puts ''
     square = choose_valid_spot
@@ -457,9 +554,16 @@ class TTTGame
   # rubocop:disable Metrics/MethodLength
   def choose_valid_spot
     square = nil
+    helped = false
     loop do
+      answer = gets.chomp
+      if answer == "help" && !helped
+        cheat_display
+        helped = true
+        answer = gets.chomp
+      end
       begin
-        square = Integer(gets.chomp)
+        square = Integer(answer)
       rescue ArgumentError
         square = nil
       end
@@ -474,25 +578,26 @@ class TTTGame
     board[board.unmarked_keys.sample] = computer.marker
   end
 
-  # rubocop:disable Style/ParenthesesAroundCondition
   def medium_moves
-    choice = if (winning_spot = immediate_win_for(computer))
-               winning_spot
-             elsif (defensive_move = immediate_win_for(human))
-               defensive_move
+    winning_spots = immediate_wins_for(computer)
+    defensive_moves = immediate_wins_for(human)
+    choice = if !winning_spots.empty?
+               winning_spots.sample
+             elsif !defensive_moves.empty?
+               defensive_moves.sample
              else
                board.unmarked_keys.sample
              end
     board[choice] = computer.marker
   end
-  # rubocop:enable Style/ParenthesesAroundCondition
 
-  def immediate_win_for(player)
+  def immediate_wins_for(player)
+    winning_spots = []
     Board::WINNING_LINES.each do |line|
       winning_spot = spot_wins(line, player)
-      return winning_spot if winning_spot
+      winning_spots << winning_spot if winning_spot
     end
-    nil
+    winning_spots
   end
 
   # rubocop:disable Metrics/MethodLength
@@ -516,46 +621,14 @@ class TTTGame
     board.unmarked_keys.size == 9
   end
 
-  # rubocop:disable Style/ParenthesesAroundCondition
   def unbeatable_moves
-    if (winning_spot = immediate_win_for(computer))
-      board[winning_spot] = computer.marker
+    winning_spots = immediate_wins_for(computer)
+    if !winning_spots.empty?
+      board[winning_spots.sample] = computer.marker
     elsif first_move?
       board[board.unmarked_keys.sample] = computer.marker
     else
       load(smart_move)
-    end
-  end
-  # rubocop:enable Style/ParenthesesAroundCondition
-
-  def load(method)
-    t1 = Thread.new do
-      method.call
-    end
-    t2 = Thread.new do
-      spin(t1)
-    end
-    t1.join
-    t2.join
-  end
-
-  def spin(thread)
-    spinner = Enumerator.new do |e|
-      loop do
-        e.yield '|'.red
-        e.yield '/'.red
-        e.yield '-'.red
-        e.yield '\\'.red
-      end
-    end
-
-    loop do
-      break unless thread.alive?
-      printf("\r%s%s %s ",
-             ' ' * FormatIO::CURSOR_SPACE,
-             'LOADING'.red,
-             spinner.next)
-      sleep(0.1)
     end
   end
 
@@ -614,7 +687,7 @@ class TTTGame
     return nil, get_score(player, brd) if brd.someone_won? || brd.full?
 
     available_keys, scores = scores_for_unmarked_spots(player, brd, opponent)
-    
+
     choices = perfect_choices(scores)
     points = reverse_for_lower_stack_frame(scores[choices.sample])
     moves = choices.map { |choice| available_keys[choice] }
@@ -669,7 +742,7 @@ class TTTGame
 
   def reset
     board.reset
-    @turn_idx = starting_player_idx
+    self.turn_idx = starting_player_idx
     clear
   end
 
@@ -680,16 +753,16 @@ class TTTGame
   end
 
   def current_player_moves
-    @move_methods[@turn_idx].call
+    move_methods[turn_idx].call
     switch_current_method
   end
 
   def switch_current_method
-    @turn_idx = (@turn_idx + 1) % 2
+    self.turn_idx = (turn_idx + 1) % 2
   end
 
   def human_turn?
-    @turn_idx == 0
+    turn_idx == 0
   end
 end
 
