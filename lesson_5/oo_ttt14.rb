@@ -130,11 +130,46 @@ class Square
 end
 
 class Player
-  attr_accessor :score, :marker
+  include FormatIO
 
-  def initialize(marker)
-    @marker = marker
+  attr_accessor :score
+  attr_reader :name, :marker
+
+  @@names = []
+  @@markers = []
+  @@m_idx = 0
+  @@m_jdx = 1
+
+  def initialize
     @score = 0
+  end
+
+  def marker=(mark)
+    if mark.length != 1
+      puts "Marker must be a single character. Try something else"
+      self.marker = gets.chomp
+    elsif @@m_idx == 1 && @@markers[@@m_jdx].to_s.downcase == mark.downcase
+      puts "Sorry, that marker is taken. Try something else"
+      self.marker = gets.chomp
+    else
+      @marker = mark
+      @@markers[@@m_idx] = mark
+      @@m_idx = (@@m_idx + 1) % 2
+      @@m_jdx = (@@m_jdx + 1) % 2
+    end
+  end
+
+  def name=(str)
+    if str.empty?
+      puts "You must enter a name."
+      self.name = gets.chomp
+    elsif @@names.include?(str)
+      puts "Sorry, that name is taken. Please enter another name:"
+      self.name = gets.chomp
+    else
+      @name = str
+      @@names << str
+    end
   end
 end
 
@@ -146,7 +181,6 @@ class TTTGame
   FIRST_TO_MOVE_IDX = 0
   WIN_CONDITION = 5
 
-  # rubocop:disable Metrics/MethodLength
   def play
     clear
     display_welcome_message
@@ -161,7 +195,6 @@ class TTTGame
     end
     display_goodbye_message
   end
-  # rubocop:enable Metrics/MethodLength
 
   private
 
@@ -174,17 +207,9 @@ class TTTGame
 
   def set_names
     puts "Enter your name:"
-    self.username = user_set_name
+    human.name = gets.chomp
     puts "Enter a name for your opponent:"
-    self.computer_name = user_set_name
-  end
-
-  def user_set_name
-    loop do
-      name = gets.chomp
-      return name unless name.empty?
-      puts "You must enter a name."
-    end
+    computer.name = gets.chomp
   end
 
   def set_markers
@@ -198,25 +223,21 @@ class TTTGame
     case answer
     when 'y'
       choose_markers
+    when 'n'
+      reset_default_markers
     end
+  end
+
+  def reset_default_markers
+    human.marker = HUMAN_MARKER
+    computer.marker = COMPUTER_MARKER
   end
 
   def choose_markers
     puts "Choose your marker"
-    mark = nil
-    loop do
-      mark = gets.chomp
-      break if mark.length == 1
-      puts "Invalid input. Marker must be 1 character"
-    end
-    human.marker = mark
-    puts "Choose computer marker"
-    loop do
-      mark = gets.chomp
-      break if mark.length == 1
-      puts "Invalid input. Marker must be 1 character"
-    end
-    computer.marker = mark
+    human.marker = gets.chomp
+    puts "Choose #{computer.name}'s marker"
+    computer.marker = gets.chomp
   end
 
   def set_difficulty
@@ -265,8 +286,12 @@ class TTTGame
     if human.score == WIN_CONDITION
       puts "You won the tournament!"
     else
-      puts "Computer won the tournament!"
+      puts "#{computer.name} won the tournament!"
     end
+    puts ''
+    puts 'FINAL SCORE'
+    puts "#{human.name}: #{human.score} #{computer.name}: #{computer.score}"
+    puts ''
   end
 
   def reset_tournament
@@ -284,6 +309,7 @@ class TTTGame
     loop do
       display_board
       player_move
+      clear_screen_and_display_board
       display_result
       if tournament_over?
         self.tournament_won = true
@@ -309,12 +335,12 @@ class TTTGame
   end
 
   attr_reader :board, :human, :computer
-  attr_accessor :tournament_won, :starting_player_idx, :username, :computer_name
+  attr_accessor :tournament_won, :starting_player_idx
 
   def initialize
     @board = Board.new
-    @human = Player.new(HUMAN_MARKER)
-    @computer = Player.new(COMPUTER_MARKER)
+    @human = Player.new
+    @computer = Player.new
     @move_methods = [Proc.new { human_moves }, Proc.new { computer_moves }]
     @turn_idx = FIRST_TO_MOVE_IDX
     @starting_player_idx = FIRST_TO_MOVE_IDX
@@ -339,8 +365,8 @@ class TTTGame
 
   def display_board
     puts ""
-    puts "You're a #{human.marker}. Computer is a #{computer.marker}"
-    puts "Your score: #{human.score}. Computer score: #{computer.score}"
+    puts "You're a #{human.marker}. #{computer.name} is a #{computer.marker}"
+    puts "Your score: #{human.score}. #{computer.name}'s score: #{computer.score}"
     puts ""
     board.draw
     puts ""
@@ -389,7 +415,11 @@ class TTTGame
     puts ''
     square = nil
     loop do
-      square = gets.chomp.to_i
+      begin
+        square = Integer(gets.chomp)
+      rescue ArgumentError
+        square = nil
+      end
       break if board.unmarked_keys.include?(square)
       puts "Sorry, that's not a valid choice."
     end
@@ -472,7 +502,12 @@ class TTTGame
         end
         loop do
           break unless t1.alive?
-          printf("\r%s%s %s ", ' ' * FormatIO::CURSOR_SPACE, 'LOADING'.red, spinner.next)
+          printf(
+            "\r%s%s %s ",
+            ' ' * FormatIO::CURSOR_SPACE,
+            'LOADING'.red,
+            spinner.next
+          )
           sleep(0.1)
         end
       end
@@ -546,8 +581,6 @@ class TTTGame
   end
 
   def display_result
-    clear_screen_and_display_board
-
     case board.winning_marker
     when human.marker
       puts 'You won!'
