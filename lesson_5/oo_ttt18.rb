@@ -450,8 +450,7 @@ class TTTGame
     puts "Player Names (#{interface[:names]})"
     puts "#{enable_disable_str} Helper Tool (#{interface[:help]})"
     return if default_settings?
-    puts "Reset Default Settings " \
-    "(#{interface[:reset]})"
+    puts "Reset Default Settings (#{interface[:reset]})"
   end
   # rubocop:enable Metrics/MethodLength
   # rubocop:enable Metrics/AbcSize
