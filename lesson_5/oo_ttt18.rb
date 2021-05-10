@@ -1,5 +1,3 @@
-# frozen_string_literal: false
-
 require 'pry'
 
 class String
@@ -27,14 +25,27 @@ module IOable
     super
   end
 
+  def user_input(caps: false)
+    if caps
+      gets.chomp.upcase
+    else
+      gets.chomp
+    end
+  end
+
+  def formatted(line)
+    line = line.center(LINE_LENGTH)
+    line << "\n"
+  end
+
   def clear
     system 'clear'
   end
 
-  def invalid(clr:true, msg:'Invalid input')
+  def invalid(clr: true, msg: 'Invalid input')
     clear if clr
     puts ""
-    puts msg, red:true
+    puts msg, red: true
     method = caller[0][/`.*'/][1..-2].to_sym
     send(method)
   end
@@ -55,7 +66,7 @@ module Interfaceable
     reset: 'R',
     easy: 'E',
     medium: 'M',
-    impossible: 'I',
+    imposs: 'I',
     home: 'H',
     standard: 'S',
     num_pad: 'N',
@@ -67,7 +78,8 @@ module Interfaceable
     right: 6,
     bottom_left: 7,
     bottom: 8,
-    bottom_right: 9
+    bottom_right: 9,
+    next_row: 1
   }
 
   NUM_PAD_INTERFACE = {
@@ -84,7 +96,7 @@ module Interfaceable
     reset: '5',
     easy: '1',
     medium: '2',
-    impossible: '3',
+    imposs: '3',
     home: '0',
     standard: '1',
     num_pad: '2',
@@ -96,7 +108,8 @@ module Interfaceable
     right: 6,
     bottom_left: 1,
     bottom: 2,
-    bottom_right: 3
+    bottom_right: 3,
+    next_row: -5
   }
 end
 
@@ -198,6 +211,7 @@ class Board
 
   # rubocop:disable Metrics/AbcSize
   # rubocop:disable Metrics/MethodLength
+  # rubocop:disable Layout/LineLength
   def draw(interface)
     puts "     |     |     "
     puts "  #{@squares[interface[:top_left]]}  |  #{@squares[interface[:top]]}  |  #{@squares[interface[:top_right]]}  "
@@ -213,6 +227,7 @@ class Board
   end
   # rubocop:enable Metrics/AbcSize
   # rubocop:enable Metrics/MethodLength
+  # rubocop:enable Layout/LineLength
 
   private
 
@@ -266,10 +281,10 @@ class Player
   def marker=(mark)
     if mark.length != 1
       puts "Marker must be a single character. Try something else"
-      self.marker = gets.chomp
+      self.marker = user_input
     elsif taken?(mark)
       puts "Sorry, that marker is taken. Try something else"
-      self.marker = gets.chomp
+      self.marker = user_input
     else
       @marker = mark
       update_marker_info
@@ -299,10 +314,10 @@ class Player
   def name=(str)
     if str.empty?
       puts "You must enter a name."
-      self.name = gets.chomp
+      self.name = user_input
     elsif name_taken?(str)
       puts "Sorry, that name is taken. Please enter another name:"
-      self.name = gets.chomp
+      self.name = user_input
     else
       @name = str
       update_name_info
@@ -330,8 +345,8 @@ class TTTGame
   private
 
   attr_reader :board, :human, :computer, :smart_move
-  attr_accessor :interface, :starting_player_idx, :turn_idx, :move_methods
-  attr_writer :helper
+  attr_accessor :interface, :starting_player_idx,
+                :turn_idx, :move_methods, :helper
 
   def initialize
     @interface = STANDARD_INTERFACE
@@ -348,7 +363,7 @@ class TTTGame
     puts "\n"
     puts "Please enter your name"
     computer.name = COMPUTER_NAME
-    human.name = gets.chomp
+    human.name = user_input
   end
 
   def ready_moves
@@ -376,7 +391,7 @@ class TTTGame
   def home_navigation
     home_display
 
-    case gets.chomp.upcase
+    case user_input(caps: true)
     when interface[:play] then start_tournament
     when interface[:settings] then clear_and_settings_menu
     when interface[:exit] then clear_and_exit_game
@@ -403,7 +418,7 @@ class TTTGame
   def settings_menu
     display_settings
 
-    case gets.chomp.upcase
+    case user_input(caps: true)
     when interface[:home] then clear_and_home_navigation
     when interface[:difficulty] then clear_and_set_difficulty
     when interface[:interface] then clear_and_set_interface
@@ -411,16 +426,15 @@ class TTTGame
     when interface[:names] then set_names
     when interface[:help] then toggle_helper_and_settings_menu
     when interface[:reset]
-      unless default_settings?
-        reset_default_settings
-      else
+      if default_settings?
         invalid
+      else
+        reset_default_settings
       end
     else
       invalid
     end
   end
-  # rubocop:enable Metrics/MethodLength
   # rubocop:enable Metrics/CyclomaticComplexity
 
   def display_settings
@@ -435,103 +449,12 @@ class TTTGame
     puts "Markers (#{interface[:markers]})"
     puts "Player Names (#{interface[:names]})"
     puts "#{enable_disable_str} Helper Tool (#{interface[:help]})"
-    puts "Reset Default Settings (#{interface[:reset]})" unless default_settings?
+    return if default_settings?
+    puts "Reset Default Settings " \
+    "(#{interface[:reset]})"
   end
+  # rubocop:enable Metrics/MethodLength
   # rubocop:enable Metrics/AbcSize
-
-  def reset_default_settings
-    reset_default_difficulty
-    self.interface = STANDARD_INTERFACE
-    reset_default_markers
-    computer.name = COMPUTER_NAME unless computer.name == COMPUTER_NAME
-    toggle_helper if helper_enabled?
-    clear_and_settings_menu
-  end
-
-  def default_settings?
-    move_methods[1] == @default_ai_move &&
-    self.interface == STANDARD_INTERFACE &&
-    human.marker == HUMAN_MARKER &&
-    computer.marker == COMPUTER_MARKER &&
-    computer.name == COMPUTER_NAME &&
-    !helper_enabled?
-  end
-
-  def reset_default_difficulty
-    move_methods[1] = @default_ai_move
-  end
-
-  def clear_and_set_interface
-    clear
-    set_interface
-  end
-
-  def set_interface
-    puts "\n"
-    puts "Standard Interface (#{interface[:standard]})"
-    puts "Num Pad Interface (#{interface[:num_pad]})"
-    case gets.chomp.upcase
-    when interface[:standard] then self.interface = STANDARD_INTERFACE
-    when interface[:num_pad] then self.interface = NUM_PAD_INTERFACE
-    else
-      invalid
-    end
-    clear_and_settings_menu
-  end
-
-  def reset_default_markers
-    human.marker = HUMAN_MARKER
-    computer.marker = COMPUTER_MARKER
-  end
-
-  def set_markers
-    clear
-    puts "\n"
-    puts "Choose your marker"
-    human.marker = gets.chomp
-    puts "Choose #{computer.name}'s marker"
-    computer.marker = gets.chomp
-    clear_and_settings_menu
-  end
-
-  def set_names
-    clear
-    puts "\n"
-    puts "Enter a name for your opponent"
-    computer.name = gets.chomp
-    puts "What's your name?"
-    human.name = gets.chomp
-    clear_and_settings_menu
-  end
-
-  def prompt_for_difficulty
-    puts "\n"
-    puts "Please select a difficulty level for the tournament:\n"
-    puts "Easy (#{interface[:easy]})\n"
-    puts "Medium (#{interface[:medium]})\n"
-    puts "Impossible(#{interface[:impossible]})"
-  end
-
-  def clear_and_set_difficulty
-    clear
-    set_difficulty
-  end
-
-  def set_difficulty
-    prompt_for_difficulty
-
-    move_methods[1] = case gets.chomp.upcase
-                      when interface[:easy]
-                         Proc.new { easy_moves }
-                       when interface[:medium]
-                         @default_ai_move
-                       when interface[:impossible]
-                         Proc.new { unbeatable_moves }
-                       else
-                         invalid
-                       end
-    clear_and_settings_menu
-  end
 
   def enable_disable_str
     if helper_enabled?
@@ -546,16 +469,103 @@ class TTTGame
   end
 
   def toggle_helper
-    if helper_enabled?
-      self.helper = false
-    else
-      self.helper = true
-    end
+    self.helper = !helper
   end
 
   def toggle_helper_and_settings_menu
     toggle_helper
     clear_and_settings_menu
+  end
+
+  def reset_default_settings
+    reset_default_difficulty
+    self.interface = STANDARD_INTERFACE
+    reset_default_markers
+    computer.name = COMPUTER_NAME unless computer.name == COMPUTER_NAME
+    toggle_helper if helper_enabled?
+    clear_and_settings_menu
+  end
+
+  def default_settings?
+    move_methods[1] == @default_ai_move &&
+      interface == STANDARD_INTERFACE &&
+      human.marker == HUMAN_MARKER &&
+      computer.marker == COMPUTER_MARKER &&
+      computer.name == COMPUTER_NAME &&
+      !helper_enabled?
+  end
+
+  def reset_default_difficulty
+    move_methods[1] = @default_ai_move
+  end
+
+  def clear_and_set_interface
+    clear
+    set_interface
+    clear_and_settings_menu
+  end
+
+  def set_interface
+    puts "\n"
+    puts "Standard Interface (#{interface[:standard]})"
+    puts "Num Pad Interface (#{interface[:num_pad]})"
+    case user_input(caps: true)
+    when interface[:standard] then self.interface = STANDARD_INTERFACE
+    when interface[:num_pad] then self.interface = NUM_PAD_INTERFACE
+    else
+      invalid
+    end
+  end
+
+  def reset_default_markers
+    human.marker = HUMAN_MARKER
+    computer.marker = COMPUTER_MARKER
+  end
+
+  def set_markers
+    clear
+    puts "\n"
+    puts "Choose your marker"
+    human.marker = user_input
+    puts "Choose #{computer.name}'s marker"
+    computer.marker = user_input
+    clear_and_settings_menu
+  end
+
+  def set_names
+    clear
+    puts "\n"
+    puts "Enter a name for your opponent"
+    computer.name = user_input
+    puts "What's your name?"
+    human.name = user_input
+    clear_and_settings_menu
+  end
+
+  def clear_and_set_difficulty
+    clear
+    set_difficulty
+    clear_and_settings_menu
+  end
+
+  def set_difficulty
+    prompt_for_difficulty
+
+    move_methods[1] = case user_input(caps: true)
+                      when interface[:easy] then Proc.new { easy_moves }
+                      when interface[:medium] then @default_ai_move
+                      when interface[:imposs] then Proc.new { unbeatable_moves }
+                      else
+                        invalid
+                      end
+  end
+
+  def prompt_for_difficulty
+    puts "\n"
+    puts "Please select a difficulty level for the tournament:\n"
+    puts "Easy (#{interface[:easy]})\n"
+    puts "Medium (#{interface[:medium]})\n"
+    puts "Impossible(#{interface[:imposs]})"
   end
 
   def clear_and_exit_game
@@ -565,8 +575,9 @@ class TTTGame
 
   def exit_game
     puts "\n"
-    puts "Are you sure you want to exit the game? (#{interface[:yes]}/#{interface[:no]})"
-    case gets.chomp.upcase
+    puts "Are you sure you want to exit the game? " \
+    "(#{interface[:yes]}/#{interface[:no]})"
+    case user_input(caps: true)
     when interface[:no] then clear_and_home_navigation
     when interface[:yes] then display_goodbye_message
     else
@@ -588,6 +599,15 @@ class TTTGame
     run_tournament
   end
 
+  def reset_tournament
+    self.starting_player_idx = FIRST_TO_MOVE_IDX
+    self.turn_idx = starting_player_idx
+    board.reset
+    human.score = 0
+    computer.score = 0
+    clear
+  end
+
   def run_tournament
     run_game
     if tournament_over?
@@ -597,8 +617,7 @@ class TTTGame
       reset_game
       run_tournament
     else
-      clear
-      home_navigation
+      clear_and_home_navigation
     end
   end
 
@@ -631,15 +650,18 @@ class TTTGame
 
   def play_again?
     puts "Would you like to play again? (#{interface[:yes]}/#{interface[:no]})"
-    yes_or_no
+    yes_or_no?
   end
 
-  def yes_or_no
-    case gets.chomp.upcase
+  def yes_or_no?
+    case user_input(caps: true)
     when interface[:yes] then true
     when interface[:no] then false
     else
-      invalid(clr:false, msg:"Sorry, must be #{interface[:yes]} or #{interface[:no]}")
+      invalid(
+        clr: false,
+        msg: "Sorry, must be #{interface[:yes]} or #{interface[:no]}"
+      )
     end
   end
 
@@ -715,13 +737,13 @@ class TTTGame
   # rubocop:disable Metrics/MethodLength
   def choose_valid_spot
     square = nil
-    helped = false
+    helped_already = false
     loop do
-      answer = gets.chomp.upcase
-      if answer == interface[:help] && !helped && helper_enabled?
+      answer = user_input(caps: true)
+      if answer == interface[:help] && !helped_already && helper_enabled?
         cheat_display
-        helped = true
-        answer = gets.chomp
+        helped_already = true
+        answer = user_input
       end
       begin
         square = Integer(answer)
@@ -735,42 +757,81 @@ class TTTGame
   end
   # rubocop:enable Metrics/MethodLength
 
-  # rubocop:disable Metrics/MethodLength
   def display_available_spots
-    string = ''
-    i = interface[:top_left]
-    j = 1
-    line = ''
-    loop do
-      line << if board.unmarked_keys.include?(i)
-                i.to_s
-              else
-                '_'
-              end
-
-      if (i % 3).zero?
-        line = line.center(IOable::LINE_LENGTH)
-        line << "\n"
-        string << line
-        line = ''
-        if interface == NUM_PAD_INTERFACE
-          i -= 5
-        else
-          i += 1
-        end
-      else
-        line << ' '
-        i += 1
-      end
-      j += 1
-      break if j == 10
-    end
+    string = available_grid
     print string
+  end
+
+  # rubocop:disable Metrics/MethodLength
+  def available_grid
+    grid = ''
+    line = ''
+    count = 1
+    square_idx = interface[:top_left]
+    loop do
+      line << square_unless_taken(square_idx)
+      line, grid, square_idx = update_grid_lines(line.dup, grid.dup, square_idx)
+      count += 1
+      break if count == 10
+    end
+    grid
   end
   # rubocop:enable Metrics/MethodLength
 
+  def update_grid_lines(line, grid, square_idx)
+    if end_of_line?(square_idx)
+      grid << formatted(line)
+      line = ''
+      square_idx += interface[:next_row]
+    else
+      line << ' '
+      square_idx += 1
+    end
+    return line, grid, square_idx
+  end
+
+  def square_unless_taken(square_idx)
+    if board.unmarked_keys.include?(square_idx)
+      square_idx.to_s
+    else
+      '_'
+    end
+  end
+
+  def end_of_line?(square_idx)
+    (square_idx % 3).zero?
+  end
+
+  def cheat_display
+    clear_screen_and_display_board
+    puts "Choose a square"
+    highlights = nil
+    load(-> { highlights = good_choices })
+    print highlight(available_grid, highlights)
+  end
+
+  def good_choices
+    if first_move?
+      good_choices = (1..9).to_a
+    else
+      good_choices, score = minimax(human, board, computer)
+    end
+    return good_choices unless score == 10
+    immediate_wins_for(computer)
+  end
+
+  def highlight(grid, highlights)
+    grid.chars.map do |chr|
+      if highlights.include?(chr.to_i)
+        chr.red
+      else
+        chr
+      end
+    end.join
+  end
+
   def easy_moves
-    board[board.unmarked_keys.sample] = computer.marker
+    board[random_spot] = computer.marker
   end
 
   def medium_moves
@@ -781,7 +842,7 @@ class TTTGame
              elsif !defensive_moves.empty?
                defensive_moves.sample
              else
-               board.unmarked_keys.sample
+               random_spot
              end
     board[choice] = computer.marker
   end
@@ -821,10 +882,14 @@ class TTTGame
     if !winning_spots.empty?
       board[winning_spots.sample] = computer.marker
     elsif first_move?
-      board[board.unmarked_keys.sample] = computer.marker
+      board[random_spot] = computer.marker
     else
       load(smart_move)
     end
+  end
+
+  def random_spot
+    board.unmarked_keys.sample
   end
 
   def get_score(player, brd)
@@ -869,12 +934,9 @@ class TTTGame
 
   def reverse_for_lower_stack_frame(score)
     case score
-    when 10
-      -10
-    when -10
-      10
-    else
-      0
+    when 10 then -10
+    when -10 then 10
+    when 0 then 0
     end
   end
 
@@ -904,71 +966,6 @@ class TTTGame
     brd[move] = computer.marker
     choices, _score = minimax(human, brd, computer)
     choices.size > 1
-  end
-
-  def reset_tournament
-    self.starting_player_idx = FIRST_TO_MOVE_IDX
-    self.turn_idx = starting_player_idx
-    board.reset
-    human.score = 0
-    computer.score = 0
-    clear
-  end
-
-  def cheat_display
-    clear_screen_and_display_board
-    puts "Choose a square"
-    string = ''
-    i = interface[:top_left]
-    j = 1
-    line = ''
-    loop do
-      line << if board.unmarked_keys.include?(i)
-                i.to_s
-              else
-                '_'
-              end
-
-      if (i % 3).zero?
-        line = line.center(IOable::LINE_LENGTH)
-        line << "\n"
-        string << line
-        line = ''
-        if interface == NUM_PAD_INTERFACE
-          i -= 5
-        else
-          i += 1
-        end
-      else
-        line << ' '
-        i += 1
-      end
-      j += 1
-      break if j == 10
-    end
-
-    a = Proc.new do
-      if first_move?
-        good_choices = (1..9).to_a
-      else
-        good_choices, score = minimax(human, board, computer)
-      end
-
-      if score == 10
-        good_choices = immediate_wins_for(computer)
-      end
-
-      string = string.chars.map do |chr|
-        if good_choices.include?(chr.to_i)
-          chr.red
-        else
-          chr
-        end
-      end.join
-    end
-
-    load(a)
-    print string
   end
 end
 
