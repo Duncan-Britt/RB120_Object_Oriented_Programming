@@ -1,5 +1,3 @@
-require 'pry'
-
 class String
   def colorize(color_code)
     "\e[#{color_code}m#{self}\e[0m"
@@ -12,24 +10,24 @@ module IOable
   LINE_LENGTH = 70
   CURSOR_SPACE = LINE_LENGTH / 5
 
-  def puts(message, red: false)
+  def output(message, red: false)
     if red
-      super message.center(LINE_LENGTH).red
+      puts message.center(LINE_LENGTH).red
     else
-      super message.center(LINE_LENGTH)
+      puts message.center(LINE_LENGTH)
     end
   end
 
-  def gets
+  def input
     print "#{' ' * (CURSOR_SPACE)}=> ".red
-    super
+    gets
   end
 
   def user_input(caps: false)
     if caps
-      gets.chomp.upcase
+      input.chomp.upcase
     else
-      gets.chomp
+      input.chomp
     end
   end
 
@@ -44,8 +42,8 @@ module IOable
 
   def invalid(clr: true, msg: 'Invalid input')
     clear if clr
-    puts ""
-    puts msg, red: true
+    output ""
+    output msg, red: true
     method = caller[0][/`.*'/][1..-2].to_sym
     send(method)
   end
@@ -159,6 +157,8 @@ class Board
   WINNING_LINES = [[1, 2, 3], [4, 5, 6], [7, 8, 9]] + # rows
                   [[1, 4, 7], [2, 5, 8], [3, 6, 9]] + # columns
                   [[1, 5, 9], [3, 5, 7]]              # diagonals
+  SIZE = 3
+  TOTAL_SQUARES = 9
 
   def initialize(squares={}, dupl: false)
     @squares = squares
@@ -167,7 +167,7 @@ class Board
 
   def dup
     new_squares = {}
-    (1..9).each do |key|
+    (1..TOTAL_SQUARES).each do |key|
       new_squares[key] = Square.new
       new_squares[key].marker = @squares[key].marker
     end
@@ -198,7 +198,7 @@ class Board
   def winning_marker
     WINNING_LINES.each do |line|
       squares = @squares.values_at(*line)
-      if three_identical_markers?(squares)
+      if line_identical_markers?(squares)
         return squares.first.marker
       end
     end
@@ -206,24 +206,24 @@ class Board
   end
 
   def reset
-    (1..9).each { |key| @squares[key] = Square.new }
+    (1..TOTAL_SQUARES).each { |key| @squares[key] = Square.new }
   end
 
   # rubocop:disable Metrics/AbcSize
   # rubocop:disable Metrics/MethodLength
   # rubocop:disable Layout/LineLength
   def draw(interface)
-    puts "     |     |     "
-    puts "  #{@squares[interface[:top_left]]}  |  #{@squares[interface[:top]]}  |  #{@squares[interface[:top_right]]}  "
-    puts "     |     |     "
-    puts "-----+-----+-----"
-    puts "     |     |     "
-    puts "  #{@squares[interface[:left]]}  |  #{@squares[interface[:middle]]}  |  #{@squares[interface[:right]]}  "
-    puts "     |     |     "
-    puts "-----+-----+-----"
-    puts "     |     |     "
-    puts "  #{@squares[interface[:bottom_left]]}  |  #{@squares[interface[:bottom]]}  |  #{@squares[interface[:bottom_right]]}  "
-    puts "     |     |     "
+    output "     |     |     "
+    output "  #{@squares[interface[:top_left]]}  |  #{@squares[interface[:top]]}  |  #{@squares[interface[:top_right]]}  "
+    output "     |     |     "
+    output "-----+-----+-----"
+    output "     |     |     "
+    output "  #{@squares[interface[:left]]}  |  #{@squares[interface[:middle]]}  |  #{@squares[interface[:right]]}  "
+    output "     |     |     "
+    output "-----+-----+-----"
+    output "     |     |     "
+    output "  #{@squares[interface[:bottom_left]]}  |  #{@squares[interface[:bottom]]}  |  #{@squares[interface[:bottom_right]]}  "
+    output "     |     |     "
   end
   # rubocop:enable Metrics/AbcSize
   # rubocop:enable Metrics/MethodLength
@@ -231,9 +231,9 @@ class Board
 
   private
 
-  def three_identical_markers?(squares)
+  def line_identical_markers?(squares)
     markers = squares.select(&:marked?).collect(&:marker)
-    return false if markers.size != 3
+    return false if markers.size != SIZE
     markers.min == markers.max
   end
 end
@@ -268,10 +268,10 @@ class Player
 
   @@names = []
   @@markers = []
-  @@m_idx = 0
-  @@m_jdx = 1
-  @@n_idx = 0
-  @@n_jdx = 1
+  @@marker_idx = 0
+  @@marker_jdx = 1
+  @@name_idx = 0
+  @@name_jdx = 1
 
   def initialize(marker)
     @score = 0
@@ -280,10 +280,10 @@ class Player
 
   def marker=(mark)
     if mark.length != 1
-      puts "Marker must be a single character. Try something else"
+      output "Marker must be a single character. Try something else"
       self.marker = user_input
     elsif taken?(mark)
-      puts "Sorry, that marker is taken. Try something else"
+      output "Sorry, that marker is taken. Try something else"
       self.marker = user_input
     else
       @marker = mark
@@ -292,31 +292,31 @@ class Player
   end
 
   def update_marker_info
-    @@markers[@@m_idx] = marker
-    @@m_idx = (@@m_idx + 1) % 2
-    @@m_jdx = (@@m_jdx + 1) % 2
+    @@markers[@@marker_idx] = marker
+    @@marker_idx = (@@marker_idx + 1) % 2
+    @@marker_jdx = (@@marker_jdx + 1) % 2
   end
 
   def taken?(mark)
-    @@m_idx == 1 && @@markers[@@m_jdx].to_s.downcase == mark.downcase
+    @@marker_idx == 1 && @@markers[@@marker_jdx].to_s.downcase == mark.downcase
   end
 
   def name_taken?(nom)
-    @@n_idx == 1 && @@names[@@n_jdx].to_s.downcase == nom.downcase
+    @@name_idx == 1 && @@names[@@name_jdx].to_s.downcase == nom.downcase
   end
 
   def update_name_info
-    @@names[@@n_idx] = name
-    @@n_idx = (@@n_idx + 1) % 2
-    @@n_jdx = (@@n_jdx + 1) % 2
+    @@names[@@name_idx] = name
+    @@name_idx = (@@name_idx + 1) % 2
+    @@name_jdx = (@@name_jdx + 1) % 2
   end
 
   def name=(str)
     if str.empty?
-      puts "You must enter a name."
+      output "You must enter a name."
       self.name = user_input
     elsif name_taken?(str)
-      puts "Sorry, that name is taken. Please enter another name:"
+      output "Sorry, that name is taken. Please enter another name:"
       self.name = user_input
     else
       @name = str
@@ -360,8 +360,8 @@ class TTTGame
 
   def default_names
     clear
-    puts "\n"
-    puts "Please enter your name"
+    output "\n"
+    output "Please enter your name"
     computer.name = COMPUTER_NAME
     human.name = user_input
   end
@@ -379,8 +379,8 @@ class TTTGame
   end
 
   def display_welcome_message
-    puts "\n"
-    puts "Welcome to Tic Tac Toe!"
+    output "\n"
+    output "Welcome to Tic Tac Toe!"
   end
 
   def clear_and_home_navigation
@@ -401,10 +401,10 @@ class TTTGame
   end
 
   def home_display
-    puts "\n"
-    puts "Play round (#{interface[:play]})"
-    puts "Settings Menu (#{interface[:settings]})"
-    puts "Exit (#{interface[:exit]})"
+    output "\n"
+    output "Play round (#{interface[:play]})"
+    output "Settings Menu (#{interface[:settings]})"
+    output "Exit (#{interface[:exit]})"
   end
 
   def clear_and_settings_menu
@@ -438,19 +438,19 @@ class TTTGame
   # rubocop:enable Metrics/CyclomaticComplexity
 
   def display_settings
-    puts "\n"
-    puts "Enter '#{interface[:home]}' to return to home screen"
-    puts ''
-    puts 'SETTINGS'
-    puts ''
+    output "\n"
+    output "Enter '#{interface[:home]}' to return to home screen"
+    output ''
+    output 'SETTINGS'
+    output ''
 
-    puts "Difficulty (#{interface[:difficulty]})"
-    puts "Interface (#{interface[:interface]})"
-    puts "Markers (#{interface[:markers]})"
-    puts "Player Names (#{interface[:names]})"
-    puts "#{enable_disable_str} Helper Tool (#{interface[:help]})"
+    output "Difficulty (#{interface[:difficulty]})"
+    output "Interface (#{interface[:interface]})"
+    output "Markers (#{interface[:markers]})"
+    output "Player Names (#{interface[:names]})"
+    output "#{enable_disable_str} Helper Tool (#{interface[:help]})"
     return if default_settings?
-    puts "Reset Default Settings (#{interface[:reset]})"
+    output "Reset Default Settings (#{interface[:reset]})"
   end
   # rubocop:enable Metrics/MethodLength
   # rubocop:enable Metrics/AbcSize
@@ -505,9 +505,9 @@ class TTTGame
   end
 
   def set_interface
-    puts "\n"
-    puts "Standard Interface (#{interface[:standard]})"
-    puts "Num Pad Interface (#{interface[:num_pad]})"
+    output "\n"
+    output "Standard Interface (#{interface[:standard]})"
+    output "Num Pad Interface (#{interface[:num_pad]})"
     case user_input(caps: true)
     when interface[:standard] then self.interface = STANDARD_INTERFACE
     when interface[:num_pad] then self.interface = NUM_PAD_INTERFACE
@@ -523,20 +523,20 @@ class TTTGame
 
   def set_markers
     clear
-    puts "\n"
-    puts "Choose your marker"
+    output "\n"
+    output "Choose your marker"
     human.marker = user_input
-    puts "Choose #{computer.name}'s marker"
+    output "Choose #{computer.name}'s marker"
     computer.marker = user_input
     clear_and_settings_menu
   end
 
   def set_names
     clear
-    puts "\n"
-    puts "Enter a name for your opponent"
+    output "\n"
+    output "Enter a name for your opponent"
     computer.name = user_input
-    puts "What's your name?"
+    output "What's your name?"
     human.name = user_input
     clear_and_settings_menu
   end
@@ -560,11 +560,11 @@ class TTTGame
   end
 
   def prompt_for_difficulty
-    puts "\n"
-    puts "Please select a difficulty level for the tournament:\n"
-    puts "Easy (#{interface[:easy]})\n"
-    puts "Medium (#{interface[:medium]})\n"
-    puts "Impossible(#{interface[:imposs]})"
+    output "\n"
+    output "Please select a difficulty level for the tournament:\n"
+    output "Easy (#{interface[:easy]})\n"
+    output "Medium (#{interface[:medium]})\n"
+    output "Impossible(#{interface[:imposs]})"
   end
 
   def clear_and_exit_game
@@ -573,8 +573,8 @@ class TTTGame
   end
 
   def exit_game
-    puts "\n"
-    puts "Are you sure you want to exit the game? " \
+    output "\n"
+    output "Are you sure you want to exit the game? " \
     "(#{interface[:yes]}/#{interface[:no]})"
     case user_input(caps: true)
     when interface[:no] then clear_and_home_navigation
@@ -586,15 +586,15 @@ class TTTGame
 
   def display_goodbye_message
     clear
-    puts "\n"
-    puts "Thanks for playing Tic Tac Toe! Goodbye!"
-    puts "\n"
+    output "\n"
+    output "Thanks for playing Tic Tac Toe! Goodbye!"
+    output "\n"
   end
 
   def start_tournament
     reset_tournament
-    puts "\n"
-    puts "First player to win #{WIN_CONDITION} rounds wins the tournament!"
+    output "\n"
+    output "First player to win #{WIN_CONDITION} rounds wins the tournament!"
     run_tournament
   end
 
@@ -622,18 +622,18 @@ class TTTGame
 
   def display_tournament_result
     if human.score == WIN_CONDITION
-      puts "You won the tournament!"
+      output "You won the tournament!"
     else
-      puts "#{computer.name} won the tournament!"
+      output "#{computer.name} won the tournament!"
     end
-    puts ''
+    output ''
     print_final_score
-    puts ''
+    output ''
   end
 
   def print_final_score
-    puts 'FINAL SCORE'
-    puts "#{human.name}: #{human.score} #{computer.name}: #{computer.score}"
+    output 'FINAL SCORE'
+    output "#{human.name}: #{human.score} #{computer.name}: #{computer.score}"
   end
 
   def reset_game
@@ -648,7 +648,7 @@ class TTTGame
   end
 
   def play_again?
-    puts "Would you like to play again? (#{interface[:yes]}/#{interface[:no]})"
+    output "Would you like to play again? (#{interface[:yes]}/#{interface[:no]})"
     yes_or_no?
   end
 
@@ -672,7 +672,7 @@ class TTTGame
       clear_screen_and_display_board if human_turn?
     end
     clear_screen_and_display_board
-    display_result
+    update_and_display_result
   end
 
   def clear_screen_and_display_board
@@ -684,28 +684,34 @@ class TTTGame
     human.score == WIN_CONDITION || computer.score == WIN_CONDITION
   end
 
-  # rubocop:disable Metrics/AbcSize
   def display_board
-    puts "\n"
-    puts "You're a #{human.marker}. #{computer.name} is a #{computer.marker}"
-    puts "Your score: #{human.score}. " \
-    "#{computer.name}'s score: #{computer.score}"
-    puts ""
+    output "\n"
+    display_markers
+    display_scores
+    output ""
     board.draw(interface)
-    puts ""
+    output ""
   end
-  # rubocop:enable Metrics/AbcSize
 
-  def display_result
+  def display_markers
+    output "You're a #{human.marker}. #{computer.name} is a #{computer.marker}"
+  end
+
+  def display_scores
+    output "Your score: #{human.score}. " \
+    "#{computer.name}'s score: #{computer.score}"
+  end
+
+  def update_and_display_result
     case board.winning_marker
     when human.marker
-      puts 'You won!'
+      output 'You won!'
       human.score += 1
     when computer.marker
-      puts "#{computer.name} won!"
+      output "#{computer.name} won!"
       computer.score += 1
     else
-      puts "It's a tie."
+      output "It's a tie."
     end
   end
 
@@ -723,12 +729,12 @@ class TTTGame
   end
 
   def human_moves
-    puts "Choose a square"
+    output "Choose a square"
     if helper_enabled?
-      puts "(Confused? Enter '#{interface[:help]}' for guidance)"
+      output "(Confused? Enter '#{interface[:help]}' for guidance)"
     end
     display_available_spots
-    puts ''
+    output ''
     square = choose_valid_spot
     board[square] = human.marker
   end
@@ -744,17 +750,19 @@ class TTTGame
         helped_already = true
         answer = user_input
       end
-      begin
-        square = Integer(answer)
-      rescue ArgumentError
-        square = nil
-      end
+      square = converted_square(answer)
       break if board.unmarked_keys.include?(square)
-      puts "Sorry, that's not a valid choice."
+      output "Sorry, that's not a valid choice."
     end
     square
   end
   # rubocop:enable Metrics/MethodLength
+
+  def converted_square(answer)
+    Integer(answer)
+  rescue ArgumentError
+    nil
+  end
 
   def display_available_spots
     string = available_grid
@@ -798,12 +806,12 @@ class TTTGame
   end
 
   def end_of_line?(square_idx)
-    (square_idx % 3).zero?
+    (square_idx % Board::SIZE).zero?
   end
 
   def cheat_display
     clear_screen_and_display_board
-    puts "Choose a square"
+    output "Choose a square"
     highlights = nil
     load(-> { highlights = good_choices })
     print highlight(available_grid, highlights)
@@ -811,7 +819,7 @@ class TTTGame
 
   def good_choices
     if first_move?
-      good_choices = (1..9).to_a
+      good_choices = (1..Board::TOTAL_SQUARES).to_a
     else
       good_choices, score = minimax(human, board, computer)
     end
@@ -867,13 +875,14 @@ class TTTGame
       end
     end
 
-    return choice if count == 2 && board.unmarked_keys.include?(choice)
+    return choice if count == Board::SIZE - 1 &&
+    board.unmarked_keys.include?(choice)
     nil
   end
   # rubocop:enable Metrics/MethodLength
 
   def first_move?
-    board.unmarked_keys.size == 9
+    board.unmarked_keys.size == Board::TOTAL_SQUARES
   end
 
   def unbeatable_moves
