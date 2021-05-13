@@ -273,9 +273,8 @@ class Player
   @@name_idx = 0
   @@name_jdx = 1
 
-  def initialize(marker)
+  def initialize
     @score = 0
-    self.marker = marker
   end
 
   def marker=(mark)
@@ -325,13 +324,29 @@ class Player
   end
 end
 
+class Human < Player
+  MARKER = "X"
+
+  def initialize
+    self.marker = MARKER
+    super
+  end
+end
+
+class Computer < Player
+  MARKER = "O"
+
+  def initialize
+    self.marker = MARKER
+    super
+  end
+end
+
 class TTTGame
   include IOable
   include Interfaceable
   include Loadable
 
-  HUMAN_MARKER = "X"
-  COMPUTER_MARKER = "O"
   FIRST_TO_MOVE_IDX = 0
   WIN_CONDITION = 5
   COMPUTER_NAME = "TTT NET"
@@ -351,8 +366,8 @@ class TTTGame
   def initialize
     @interface = STANDARD_INTERFACE
     @board = Board.new
-    @human = Player.new(HUMAN_MARKER)
-    @computer = Player.new(COMPUTER_MARKER)
+    @human = Human.new
+    @computer = Computer.new
     @helper = false
     ready_moves
     default_names
@@ -488,8 +503,8 @@ class TTTGame
   def default_settings?
     move_methods[1] == @default_ai_move &&
       interface == STANDARD_INTERFACE &&
-      human.marker == HUMAN_MARKER &&
-      computer.marker == COMPUTER_MARKER &&
+      human.marker == Human::MARKER &&
+      computer.marker == Computer::MARKER &&
       computer.name == COMPUTER_NAME &&
       !helper_enabled?
   end
@@ -517,8 +532,8 @@ class TTTGame
   end
 
   def reset_default_markers
-    human.marker = HUMAN_MARKER
-    computer.marker = COMPUTER_MARKER
+    human.marker = Human::MARKER
+    computer.marker = Computer::MARKER
   end
 
   def set_markers
@@ -648,7 +663,8 @@ class TTTGame
   end
 
   def play_again?
-    output "Would you like to play again? (#{interface[:yes]}/#{interface[:no]})"
+    output "Would you like to play again? " \
+    "(#{interface[:yes]}/#{interface[:no]})"
     yes_or_no?
   end
 
@@ -875,8 +891,9 @@ class TTTGame
       end
     end
 
-    return choice if count == Board::SIZE - 1 &&
-    board.unmarked_keys.include?(choice)
+    if count == Board::SIZE - 1 && board.unmarked_keys.include?(choice)
+      return choice
+    end
     nil
   end
   # rubocop:enable Metrics/MethodLength
