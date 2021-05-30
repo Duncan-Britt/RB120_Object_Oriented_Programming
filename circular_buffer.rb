@@ -1,12 +1,3 @@
-class Node
-  attr_reader :data
-  attr_accessor :succ
-
-  def initialize(data)
-    @data = data
-  end
-end
-
 class CircularQueue
   def enqueue(data)
     node = Node.new(data)
@@ -40,6 +31,15 @@ class CircularQueue
     @size = 0
     @head = nil
     @tail = nil
+  end
+
+  class Node
+    attr_reader :data
+    attr_accessor :succ
+
+    def initialize(data)
+      @data = data
+    end
   end
 end
 
