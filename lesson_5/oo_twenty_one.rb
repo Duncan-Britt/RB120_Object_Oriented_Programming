@@ -33,9 +33,6 @@ class Participant
     hand << deck.deal
   end
 
-  def stay
-  end
-
   def busted?
     total > 21
   end
@@ -44,7 +41,7 @@ class Participant
     not_aces = hand.reject { |card| card.face == :ace }
     ace_count = hand.size - not_aces.size
     non_ace_total = not_aces.reduce(0) do |acc, card|
-      if card.face.class == Integer
+      if card.face.instance_of?(Integer)
         acc + card.face
       else
         acc + FACE[card.face]
@@ -61,14 +58,6 @@ class Participant
     end
   end
 end
-
-# class Player < Participant
-#
-# end
-#
-# class Dealer < Participant
-#
-# end
 
 class Deck
   attr_reader :cards
@@ -104,7 +93,7 @@ class Card
 
   def to_s
     # "#{face} of #{suit}"
-    "#{face}"
+    face.to_s
   end
 
   def inspect
@@ -148,6 +137,9 @@ class Game
     case input.upcase
     when 'Q'
       system 'clear'
+      output ''
+      output 'Thank you for playing Twenty-One. Goodbye!'
+      output ''
       false
     else
       true
@@ -171,7 +163,7 @@ class Game
   def show_cards
     system 'clear'
     output "\n\n"
-    output "Dealer has: #{dealer.hand.first} and ?"
+    output "Dealer has: #{dealer.hand.first.to_s.capitalize} and ?"
     output "You have: #{join_and(player.hand)}    (#{player.total})"
   end
 
@@ -180,11 +172,13 @@ class Game
     output ''
     case player.total <=> dealer.total
     when 1
-      output "You won! Your score: #{player.total}, dealer score: #{dealer.total}"
+      output "You won! " \
+      "Your score: #{player.total}, dealer score: #{dealer.total}"
     when 0
       output "Tie!"
     when -1
-      output "Dealer won! Player score: #{player.total}, dealer score: #{dealer.total}"
+      output "Dealer won! " \
+      "Player score: #{player.total}, dealer score: #{dealer.total}"
     end
   end
 
@@ -199,6 +193,7 @@ class Game
       show_cards
       player_turn
     when 's'
+      return
     else
       output 'Invalid input.'
       player_turn
@@ -231,13 +226,13 @@ class Game
       str = ''
       i = 0
       until i == arr.size - 1
-        str << arr[i].to_s.capitalize + ', '
+        str << "#{arr[i].to_s.capitalize}, "
         i += 1
       end
-      str << 'and ' + arr[i].to_s.capitalize
+      str << "and #{arr[i].to_s.capitalize}"
     elsif arr.size == 2
       str = arr[0].to_s
-      str << ' and ' + arr[1].to_s.capitalize
+      str << " and #{arr[1].to_s.capitalize}"
     else
       arr[0].to_s
     end
