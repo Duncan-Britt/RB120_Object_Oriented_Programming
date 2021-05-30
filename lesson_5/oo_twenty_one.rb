@@ -147,6 +147,7 @@ class Game
     output_l "Press enter to play again, or enter 'Q' to quit."
     case input.upcase
     when 'Q'
+      system 'clear'
       false
     else
       true
@@ -160,15 +161,22 @@ class Game
     end
   end
 
-  def show_cards
+  def show_final_cards
     system 'clear'
     output "\n\n"
     output "Dealer has: #{join_and(dealer.hand)}    (#{dealer.total})"
     output "You have: #{join_and(player.hand)}    (#{player.total})"
   end
 
+  def show_cards
+    system 'clear'
+    output "\n\n"
+    output "Dealer has: #{dealer.hand.first} and ?"
+    output "You have: #{join_and(player.hand)}    (#{player.total})"
+  end
+
   def show_result
-    show_cards
+    show_final_cards
     output ''
     case player.total <=> dealer.total
     when 1
